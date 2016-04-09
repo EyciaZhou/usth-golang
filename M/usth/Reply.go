@@ -17,6 +17,7 @@ type Reply struct {
 	Id string `json:"id"`
 
 	RefId       string `json:"refId"`
+	RefedAuthorId string `json:"refAuthorId`
 	RefedAuthor string `json:"refedAuthor"` //cache
 	RefedContent string `json:"refedContent"` //cache
 
@@ -41,13 +42,14 @@ func (p *Dbreply) scanfOne(row scanner) (*Reply, error) {
 	var (
 		NullRefId sql.NullString
 		NullRefAuthor sql.NullString
+		NullRefAuthorId sql.NullString
 		NullRefContent sql.NullString
 	)
 
 	r := &Reply{}
 	err := row.Scan(
 		&r.Id, &r.Time, &r.AuthorName, &r.StuId, &r.Content, &r.ClassName,
-		&r.Digg, &NullRefId, &NullRefAuthor, &NullRefContent,
+		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent,
 	)
 
 	if err != nil {
@@ -56,6 +58,7 @@ func (p *Dbreply) scanfOne(row scanner) (*Reply, error) {
 
 	r.RefId = NullRefId.String
 	r.RefedAuthor = NullRefAuthor.String
+	r.RefedAuthorId = NullRefAuthorId.String
 	r.RefedContent = NullRefContent.String
 
 	return r, nil
@@ -65,6 +68,7 @@ func (p *Dbreply) scanfOneWithDigg(row scanner) (*Reply, error) {
 	var (
 		NullRefId sql.NullString
 		NullRefAuthor sql.NullString
+		NullRefAuthorId sql.NullString
 		NullRefContent sql.NullString
 
 		NullDigged sql.NullString
@@ -73,7 +77,7 @@ func (p *Dbreply) scanfOneWithDigg(row scanner) (*Reply, error) {
 	r := &Reply{}
 	err := row.Scan(
 		&r.Id, &r.Time, &r.AuthorName, &r.StuId, &r.Content, &r.ClassName,
-		&r.Digg, &NullRefId, &NullRefAuthor, &NullRefContent, &NullDigged,
+		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent, &NullDigged,
 	)
 
 	if err != nil {
@@ -82,6 +86,7 @@ func (p *Dbreply) scanfOneWithDigg(row scanner) (*Reply, error) {
 
 	r.RefId = NullRefId.String
 	r.RefedAuthor = NullRefAuthor.String
+	r.RefedAuthorId = NullRefAuthorId.String
 	r.RefedContent = NullRefContent.String
 	r.Digged = NullDigged.Valid
 
@@ -102,13 +107,13 @@ func (p *Dbreply) GetReplyFirstPage(FromId string, ClassName string, Limit int) 
 	if FromId != "" {
 		rows, err = db.Query(`
 			SELECT
-					id, time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author, ref_content, b.stu_id
+					id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
 				FROM _reply
 				LEFT JOIN
 						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
 					ON _reply.id=b.reply_id
 				WHERE class_name=?
-				ORDER BY time DESC
+				ORDER BY _time DESC
 				LIMIT ?
 			`, FromId, ClassName, Limit)
 
@@ -117,17 +122,17 @@ func (p *Dbreply) GetReplyFirstPage(FromId string, ClassName string, Limit int) 
 	} else {
 		rows, err = db.Query(`
 			SELECT
-					id, time, author_name, stu_id, content, class_name, digg, refid, ref_author, ref_content
+					id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
 				FROM _reply
 				WHERE class_name=?
-				ORDER BY time DESC
+				ORDER BY _time DESC
 				LIMIT ?
 			`, ClassName, Limit)
 
 		scan = p.scanfOne
 	}
 	if err != nil {
-		return nil, newError(TIME_GET_REPLY, "获取评论失败")
+		return nil, newError(TIME_GET_REPLY, "获取评论失败"+err.Error())
 	}
 	defer rows.Close()
 
@@ -163,7 +168,7 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 
 		rows, err = db.Query(`
 			SELECT
-					id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author, ref_content, b.stu_id
+					id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
 				FROM _reply
 				LEFT JOIN
 						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
@@ -179,7 +184,7 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 
 		rows, err = db.Query(`
 			SELECT
-					id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author, ref_content
+					id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
 				FROM _reply
 				WHERE class_name=? AND ? >= _time
 				ORDER BY _time DESC
@@ -192,7 +197,7 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 	}
 
 	if err != nil {
-		return nil, newError(TIME_GET_REPLY, "获取评论失败")
+		return nil, newError(TIME_GET_REPLY, "获取评论失败" + err.Error())
 	}
 
 	defer rows.Close()
@@ -224,7 +229,7 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 func (p *Dbreply) GetReplyFrom(FromId string, Id string) (*Reply, error) {
 	row := db.QueryRow(`
 		SELECT
-				id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author, ref_content, b.stu_id
+				id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
 			FROM _reply
 			LEFT JOIN
 						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
@@ -247,7 +252,7 @@ func (p *Dbreply) GetReplyFrom(FromId string, Id string) (*Reply, error) {
 func (p *Dbreply) GetReply(Id string) (*Reply, error) {
 	row := db.QueryRow(`
 		SELECT
-				id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author, ref_content
+				id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
 			FROM _reply
 			WHERE id=?
 			LIMIT 1
@@ -297,10 +302,10 @@ func (p *Dbreply) ReplyWithRef(AuthorName string, StuId string, Content string, 
 		}
 		result, err = db.Exec(`
 		INSERT INTO
-					_reply(_time, author_name, stu_id, content, class_name, digg, refid, ref_author, ref_content)
+					_reply(_time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content)
 				VALUES
-					(?,?,?,?,?,0,?,?,?)
-		`, ti, AuthorName, StuId, Content, ClassName, RefId, ref_reply.AuthorName, ref_reply.Content)
+					(?,?,?,?,?,0,?,?,?,?)
+		`, ti, AuthorName, StuId, Content, ClassName, RefId, ref_reply.StuId, ref_reply.AuthorName, ref_reply.Content)
 	}
 	if err != nil {
 		return "", newErrorByError(TIME_REPLY, err)
