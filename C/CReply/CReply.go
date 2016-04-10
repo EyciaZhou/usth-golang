@@ -113,5 +113,6 @@ func GetScore(ctx *macaron.Context, f session.Store) {
 		//logined
 		f.Set("api_username", username)
 	}
+	ctx.Header().Set("Content-Type", "application/json")
 	ctx.Write(resp_content)
 }

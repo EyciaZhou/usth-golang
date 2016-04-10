@@ -4,6 +4,7 @@ USE `usth`;
 
 DROP TABLE IF EXISTS `_reply`;
 DROP TABLE IF EXISTS `info`;
+DROP TABLE IF EXISTS `diggs`;
 
 CREATE TABLE `_reply` (
   `id` int(10) unsigned zerofill NOT NULL AUTO_INCREMENT,
@@ -14,6 +15,7 @@ CREATE TABLE `_reply` (
   `class_name` varchar(50) CHARACTER SET utf8 NOT NULL,
   `digg` int(10) unsigned NOT NULL,
   `refid` varchar(30),
+  `ref_author_id` varchar(30),
   `ref_author` varchar(10) CHARACTER SET utf8,
   `ref_content` varchar(250) CHARACTER SET utf8,
 
@@ -36,4 +38,3 @@ CREATE TABLE `info` (
 
   PRIMARY KEY (`stu_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-

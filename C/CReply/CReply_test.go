@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
+	"runtime"
 )
 
 func TestGetScore(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	tasks := make(chan int)
 
 	wg := sync.WaitGroup{}
 
-	for chan_i := 0; chan_i < 20; chan_i++ {
+	for chan_i := 0; chan_i < 100; chan_i++ {
 		go func(id int) {
 			for i := range tasks {
 				raw, err := usth.DBScore.GetPassing(strconv.Itoa(i), "1")
@@ -35,7 +38,7 @@ func TestGetScore(t *testing.T) {
 		}(chan_i)
 	}
 
-	for i := 2013025001; i <= 2013025099; i++ {
+	for i := 2013025001; i <= 2013025999; i++ {
 		wg.Add(1)
 		tasks <- i
 	}
