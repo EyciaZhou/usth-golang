@@ -3,7 +3,7 @@ package usth
 type DbInfo struct{}
 var DBInfo = &DbInfo {}
 
-func (p *DbInfo) Update(username string, password string, name string) { //silence
+func (p *DbInfo) Update(username string, password string, name string, class string) { //silence //TODO: class
 	db.Exec(`
 	INSERT INTO
 			info (stu_id, pwd, author_name)

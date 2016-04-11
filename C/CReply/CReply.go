@@ -11,6 +11,7 @@ import (
 func ApiRouterGroup(m *macaron.Macaron) {
 	m.Get("/Logout", Logout)
 
+	m.Get("/Score", GetScore)
 	m.Post("/Score", GetScore)
 
 	m.Group("/Reply", func() {
@@ -108,11 +109,11 @@ func GetScore(ctx *macaron.Context, f session.Store) {
 		f.Delete("api_username")
 	}
 
-	resp_content, err := usth.DBScore.Get(username, password, _type)
+	resp, err := usth.DBScore.Get(username, password, _type)
 	if err == nil {
 		//logined
 		f.Set("api_username", username)
 	}
-	ctx.Header().Set("Content-Type", "application/json")
-	ctx.Write(resp_content)
+
+	ctx.JSON(200, C.PackError(resp, err))
 }
