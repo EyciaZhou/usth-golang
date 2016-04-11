@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"fmt"
+	"sort"
 )
 
 type DbScore struct{}
@@ -32,7 +32,7 @@ var (
 	}
 
 	_BLOCKS_OF_NOT_PASS = []string{
-		"曾未通过", "尚未通过",
+		"尚未通过", "曾未通过",
 	}
 
 	_FIELDS_OF_NOT_PASS = []string{
@@ -86,11 +86,19 @@ type Block struct {
 }
 
 func TransToBlock(mp map[string][]*Course) []*Block {
-	res := make([]*Block, len(mp))
+	lp := len(mp)
+
+	res := make([]*Block, lp)
+	keys := make([]string, 0, lp)
+	for k := range mp {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
 
 	p := 0
-	for k, v := range mp {
-		res[p] = &Block{k, v}
+	for i := lp-1; i >= 0; i-- {
+		res[p] = &Block{keys[i], mp[keys[i]]}
 		p++
 	}
 
@@ -292,61 +300,6 @@ func (p *DbScore) LoginAndGetSchoolRollInfo(f *Fetcher, username string, passwor
 	return res, nil
 }
 
-func (p *DbScore) getFail(username string, password string) (map[string]interface{}, error) {
-	f := NewFetcher()
-
-	res, err := p.LoginAndGetSchoolRollInfo(f, username, password)
-	if err != nil {
-		return nil, err
-	}
-
-	blocks, err := f.NotPass()
-	if err != nil {
-		return nil, err
-	}
-	res["info"] = blocks
-
-	return res, nil
-}
-
-func (p *DbScore) getPassing(username string, password string) (map[string]interface{}, error) {
-	f := NewFetcher()
-
-	res, err := p.LoginAndGetSchoolRollInfo(f, username, password)
-	if err != nil {
-		return nil, err
-	}
-
-	blocks, err := f.All()
-	if err != nil {
-		return nil, err
-	}
-	res["info"] = blocks
-
-	return res, nil
-}
-
-func (p *DbScore) getSemester(username string, password string) (map[string]interface{}, error) {
-	f := NewFetcher()
-
-	res, err := p.LoginAndGetSchoolRollInfo(f, username, password)
-	if err != nil {
-		return nil, err
-	}
-
-	blocks, err := f.Semester()
-	if err != nil {
-		return nil, err
-	}
-	res["info"] = blocks
-
-	return res, nil
-}
-
-var (
-
-)
-
 func (p *DbScore) Get(username string, password string, _type string) (map[string]interface{}, error) {
 	f := NewFetcher()
 
@@ -358,8 +311,6 @@ func (p *DbScore) Get(username string, password string, _type string) (map[strin
 	typs := strings.Split(_type, "|")
 
 	var bsall []*Block
-
-	fmt.Println(typs)
 
 	for _, typ := range typs {
 		var bs []*Block
