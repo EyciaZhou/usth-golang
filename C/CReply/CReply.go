@@ -11,27 +11,26 @@ import (
 func ApiRouterGroup(m *macaron.Macaron) {
 	m.Get("/Logout", Logout)
 
-	m.Get("/Score", GetScore)
 	m.Post("/Score", GetScore)
 
 	m.Group("/Reply", func() {
-		m.Get("/:classname/:limit/:lstid/:lstti", getReplys)
+		m.Get("/course/:classname/:limit/:lstid/:lstti", getReplys)
 		m.Get("/:id", getReply)
-		m.Post("/:classname", addReply)
-		m.Post("/:classname/:id/reply", addReply)
-		m.Get("/:classname/:id/digg", getDiggCount)
-		m.Post("/:classname/:id/digg/add", diggAdd)
+
+		m.Post("/course/:classname", addReply)
+		m.Post("/course/:classname/:id/reply", addReply)
+
+		m.Get("/:id/digg", getDiggCount)
+		m.Post("/:id/digg/add", diggAdd)
 	})
 }
 
 func getDiggCount(ctx *macaron.Context, f session.Store) {
-	_ = ctx.Params(":classname")
 	reply_id := ctx.Params(":id")
 	ctx.JSON(200, C.PackError(usth.DBReply.GetDigg(reply_id)))
 }
 
 func diggAdd(ctx *macaron.Context, f session.Store) {
-	_ = ctx.Params(":classname")
 	reply_id := ctx.Params(":id")
 	if f.Get("api_username") == nil || f.Get("api_username") == "" {
 		ctx.JSON(200, C.PackError(nil, errors.New("没有登陆或者登录过期")))
