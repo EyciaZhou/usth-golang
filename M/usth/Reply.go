@@ -332,18 +332,21 @@ func (p *Dbreply) GetDigg(Id string) (int, error) {
 }
 
 func (p *Dbreply) Digg(Id string, FromId string) error {
-	result, _ := db.Exec(`
+	result, err := db.Exec(`
 		INSERT INTO
 				diggs(reply_id, stu_id)
 			VALUES(?, ?)
 	`, Id, FromId)
+	if err != nil {
+		return newError(TIME_DIGG, "该评论不存在或重复点赞")
+	}
 
 	diged, _ := result.RowsAffected()
 	if diged == 0 {
-		return newError(TIME_DIGG, "重复点赞")
+		return newError(TIME_DIGG, "点赞失败")
 	}
 
-	result, err := db.Exec(`
+	result, err = db.Exec(`
 		UPDATE
 			_reply
 		SET

@@ -43,7 +43,7 @@ func init() {
 
 	var err error
 	log.Info("M.msghub Start Connect mysql")
-	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
+	url := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?collation=utf8mb4_general_ci", config.DBUsername, config.DBPassword, config.DBAddress, config.DBPort, config.DBName)
 	db, err = sql.Open("mysql", url)
 	if err != nil {
 		log.Panic("M.msghub Can't Connect DB REASON : " + err.Error())
