@@ -66,6 +66,8 @@ type SchoolRollInfo struct {
 	Stu_id string `json:"stu_id"`
 	Name   string `json:"name"`
 	Class  string `json:"class"`
+
+	Head string `json:"head"`
 }
 
 type Course struct {
@@ -294,8 +296,12 @@ func (p *DbScore) LoginAndGetSchoolRollInfo(f *Fetcher, username string, passwor
 	}
 
 	res["school_roll_info"] = school_roll_info
-
 	DBInfo.Update(school_roll_info.Stu_id, password, school_roll_info.Name, school_roll_info.Class)
+	school_roll_info2, err := DBInfo.GetUserInfo(school_roll_info.Stu_id)
+
+	if err == nil {
+		res["school_roll_info"] = school_roll_info2
+	}
 
 	return res, nil
 }

@@ -22,6 +22,8 @@ type Reply struct {
 	RefedContent string `json:"refedContent"` //cache
 
 	Digged bool `json:"digged"`
+
+	Head string `json:"head"`
 }
 
 type Dbreply struct{}
@@ -44,12 +46,13 @@ func (p *Dbreply) scanfOne(row scanner) (*Reply, error) {
 		NullRefAuthor sql.NullString
 		NullRefAuthorId sql.NullString
 		NullRefContent sql.NullString
+		NullHead sql.NullString
 	)
 
 	r := &Reply{}
 	err := row.Scan(
 		&r.Id, &r.Time, &r.AuthorName, &r.StuId, &r.Content, &r.ClassName,
-		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent,
+		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent, &NullHead,
 	)
 
 	if err != nil {
@@ -60,6 +63,9 @@ func (p *Dbreply) scanfOne(row scanner) (*Reply, error) {
 	r.RefedAuthor = NullRefAuthor.String
 	r.RefedAuthorId = NullRefAuthorId.String
 	r.RefedContent = NullRefContent.String
+	if (NullHead.Valid) {
+		r.Head = HeadStore.GetHead(r.StuId, NullHead.String)
+	}
 
 	return r, nil
 }
@@ -72,12 +78,13 @@ func (p *Dbreply) scanfOneWithDigg(row scanner) (*Reply, error) {
 		NullRefContent sql.NullString
 
 		NullDigged sql.NullString
+		NullHead sql.NullString
 	)
 
 	r := &Reply{}
 	err := row.Scan(
 		&r.Id, &r.Time, &r.AuthorName, &r.StuId, &r.Content, &r.ClassName,
-		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent, &NullDigged,
+		&r.Digg, &NullRefId, &NullRefAuthorId, &NullRefAuthor, &NullRefContent, &NullDigged, &NullHead,
 	)
 
 	if err != nil {
@@ -89,6 +96,10 @@ func (p *Dbreply) scanfOneWithDigg(row scanner) (*Reply, error) {
 	r.RefedAuthorId = NullRefAuthorId.String
 	r.RefedContent = NullRefContent.String
 	r.Digged = NullDigged.Valid
+	if (NullHead.Valid) {
+		r.Head = HeadStore.GetHead(r.StuId, NullHead.String)
+	}
+
 
 	return r, nil
 }
@@ -106,27 +117,37 @@ func (p *Dbreply) GetReplyFirstPage(FromId string, ClassName string, Limit int) 
 
 	if FromId != "" {
 		rows, err = db.Query(`
-			SELECT
-					id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
-				FROM _reply
+			SELECT id, _time, tb1.author_name, tb1.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id, info.head
+				FROM (
+					SELECT
+						id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
+					FROM _reply
+					WHERE class_name=?
+					ORDER BY _time DESC, id DESC
+					LIMIT ?) as tb1
 				LEFT JOIN
-						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
-					ON _reply.id=b.reply_id
-				WHERE class_name=?
-				ORDER BY _time DESC
-				LIMIT ?
-			`, FromId, ClassName, Limit)
+					(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
+				ON tb1.id=b.reply_id
+				LEFT JOIN
+					info
+				ON tb1.stu_id=info.stu_id
+			`, ClassName, Limit, FromId)
 
 		scan = p.scanfOneWithDigg
 
 	} else {
 		rows, err = db.Query(`
-			SELECT
-					id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
-				FROM _reply
-				WHERE class_name=?
-				ORDER BY _time DESC
-				LIMIT ?
+			SELECT id, _time, tb1.author_name, tb1.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, info.head
+				FROM (
+					SELECT
+						id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
+					FROM _reply
+					WHERE class_name=?
+					ORDER BY _time DESC, id DESC
+					LIMIT ?) as tb1
+				LEFT JOIN
+					info
+				ON tb1.stu_id=info.stu_id
 			`, ClassName, Limit)
 
 		scan = p.scanfOne
@@ -167,29 +188,39 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 	if FromId != "" {
 
 		rows, err = db.Query(`
-			SELECT
-					id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
-				FROM _reply
+			SELECT id, _time, tb1.author_name, tb1.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id, info.head
+				FROM (
+					SELECT
+						id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
+					FROM _reply
+					WHERE class_name=? AND (? > _time OR (_time=? AND id < ?))
+					ORDER BY _time DESC, id DESC
+					LIMIT ?) as tb1
 				LEFT JOIN
-						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
-					ON _reply.id=b.reply_id
-				WHERE class_name=? AND ? >= _time
-				ORDER BY _time DESC
-				LIMIT ?
-			`, FromId, ClassName, lstti, Limit + 1)
+					(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
+				ON tb1.id=b.reply_id
+				LEFT JOIN
+					info
+				ON tb1.stu_id=info.stu_id
+			`, ClassName, lstti, lstti, lstid, Limit, FromId)
 
 		scan = p.scanfOneWithDigg
 
 	} else {
 
 		rows, err = db.Query(`
-			SELECT
-					id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
-				FROM _reply
-				WHERE class_name=? AND ? >= _time
-				ORDER BY _time DESC
-				LIMIT ?
-			`, ClassName, lstti, Limit + 1)
+			SELECT id, _time, tb1.author_name, tb1.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, info.head
+				FROM (
+					SELECT
+						id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
+					FROM _reply
+					WHERE class_name=? AND (? > _time OR (_time=? AND id < ?))
+					ORDER BY _time DESC, id DESC
+					LIMIT ?) as tb1
+				LEFT JOIN
+					info
+				ON tb1.stu_id=info.stu_id
+			`,ClassName, lstti, lstti, lstid, Limit)
 
 		scan = p.scanfOne
 
@@ -229,11 +260,14 @@ func (p *Dbreply) GetReplyPageFlip(FromId string, ClassName string, Limit int, l
 func (p *Dbreply) GetReplyFrom(FromId string, Id string) (*Reply, error) {
 	row := db.QueryRow(`
 		SELECT
-				id, _time, author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id
+				id, _time, _reply.author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, b.stu_id, info.head
 			FROM _reply
 			LEFT JOIN
 						(SELECT reply_id, stu_id FROM diggs WHERE stu_id=?) AS b
 					ON _reply.id=b.reply_id
+			LEFT JOIN
+					info
+				ON _reply.stu_id=info.stu_id
 			WHERE id=?
 			LIMIT 1
 	`, Id)
@@ -252,8 +286,11 @@ func (p *Dbreply) GetReplyFrom(FromId string, Id string) (*Reply, error) {
 func (p *Dbreply) GetReply(Id string) (*Reply, error) {
 	row := db.QueryRow(`
 		SELECT
-				id, _time, author_name, stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content
+				id, _time, _reply.author_name, _reply.stu_id, content, class_name, digg, refid, ref_author_id, ref_author, ref_content, info.head
 			FROM _reply
+			LEFT JOIN
+					info
+				ON _reply.stu_id=info.stu_id
 			WHERE id=?
 			LIMIT 1
 	`, Id)

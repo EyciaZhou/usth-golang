@@ -6,6 +6,7 @@ import (
 	"github.com/EyciaZhou/usth-golang/M/usth"
 	"github.com/EyciaZhou/msghub-http/C"
 	"github.com/wendal/errors"
+	"net/http"
 )
 
 func ApiRouterGroup(m *macaron.Macaron) {
@@ -23,6 +24,19 @@ func ApiRouterGroup(m *macaron.Macaron) {
 		m.Get("/:id/digg", getDiggCount)
 		m.Post("/:id/digg/add", diggAdd)
 	})
+
+	m.Get("/head/getToken", getHeadToken)
+	m.Post("/head/callback", usth.HeadStore.Callback)
+}
+
+func getHeadToken(ctx *macaron.Context, f session.Store) {
+	username := f.Get("api_usernamels");
+	if username == nil || username == "" {
+		ctx.JSON(http.StatusOK, C.PackError(nil, errors.New("没有登陆或者登录过期")))
+		return
+	}
+	token := usth.HeadStore.MakeupUploadToken(username.(string))
+	ctx.JSON(http.StatusOK, C.Pack(token))
 }
 
 func getDiggCount(ctx *macaron.Context, f session.Store) {
